@@ -24,7 +24,7 @@ def db_connect(db, u, pw, h, pn):
     # end of try/except/else for connection
 
     return con
-    # end db_connect()
+# end db_connect()
     
 # declare variables necessary for database connection
 database = " "
@@ -389,10 +389,7 @@ for j in range(len(columns)):
 
 # add last characters to complete table create_string
 create_string += ");"
-"""
-# cursor needed to execute PSQL commands.
-cursor = connection.cursor()
-"""
+
 # try/except/else - create table and provide confirmation or provide human readable error message
 try:
     cursor.execute(create_string)
@@ -407,6 +404,8 @@ except psycopg2.Error as err:
     
 else:
     print("Table succesfully created!")
+    # Had to commit these changes to get rid of 'relation "schema_name.table_name" does not exist' error while inserting further down.
+    connection.commit()
     connection.close()
 # end of try/except/else
 
@@ -415,10 +414,7 @@ insert_string = 'insert into {schema}.{table_name} values '.format(schema = sche
 
 # create variable to store the index of the last index in records[], for use later
 last_record_index = (len(records) -1)
-"""
-# preparing cursor needed to execute PSQL statements
-cursor = connection.cursor()
-"""
+
 # adds records from records[], starting with index 1, to insert_string
 for k in range(1, len(records)):
     # store current record for easy reference.
@@ -483,10 +479,7 @@ else:
 
 # create PSQL statement to retrieve lines written to database table
 select_string = "SELECT * FROM {schema}.{table_name};".format(schema = schema, table_name = table_name)
-"""
-# cursor needed to execute PSQL statement
-cursor = connection.cursor()
-"""
+
 # execute statement
 cursor.execute(select_string)
 
@@ -505,8 +498,17 @@ if commit.lower() == "y":
     connection.commit()
     print("Your changes have been commited to the database.")
 else:
+    # rolling back inserts
     connection.rollback()
-    print("Totally understand, all changes have been rolled back, no changes made to the database")
+    try:
+        # table was commited earlier, discarding it on user request
+        cursor.execute("DROP TABLE {schema}.{table_name};".format(schema = schema, table_name = table_name))
+    except psycopg2.Error as err:
+        print("We weren't able to drop the table, sorry")
+    else:
+        # commit, ironically, to ensure table is dropped. 
+        connection.commit()
+        print("Totally understand, all changes have been rolled back, no changes made to the database")
 
 # close connection to database. 
 connection.close()
