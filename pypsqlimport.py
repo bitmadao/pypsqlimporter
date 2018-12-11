@@ -1,39 +1,213 @@
-# pypsqlimport.py creates table based on a given delimited text file to a database
-
-# Imports PostgreSQL library
+# pypsqlimport.py creates table based on arguments at launch and a given delimited text file to a database
+#
+# import sys module for access to sys.argv
+import sys
+# import getpass to get a password
+import getpass
+# import PostgreSQL library
 import psycopg2
-
-# try/except/else attempt connection to database, generate a human readable error message if attempt is unsuccessful.
-try:
-    connection = psycopg2.connect(database = "staff", user = "python", password = "Password.", host = "127.0.0.1", port = "5432")
-
-except psycopg2.Error as err:
-    print("An error was generated!")
-    print(err)
+# defining a function for connecting to the db.
+def db_connect(db, u, pw, h, pn):
     
-else:
-    print("Connection to database was successful!")
-
-# prompts user to enter filepath/-name for textfile
-while True:
-    filepath = input("Please provide a filename: ").strip()
-    
-    # try/except/else - attempt to open textfile, provide user-friendly error message if it fails
+    # try/except/else attempt connection to database, generate a human readable error message if attempt is unsuccessful.
     try:
-        f = open(filepath)
-    except FileNotFoundError as err:
-        print("Terribly sorry, we can't make sense of this filename/path. Please try again.")
-        
-        # continue loop, user must input filename again
-        continue
-    else:
-        print("File loaded successfully")
-        
-        # break while loop
-        break
-# end of while loop
+        con = psycopg2.connect(database = database, user = user, password = password, host = host, port = port, sslmode = "disable")
 
-# list - store records for import into mystaff.employees
+    except psycopg2.Error as err:
+        print("An error was generated!")
+        print(err)
+        print("Terminating; Thank you for using this script")
+        exit()
+        
+    else:
+        print("Connection to database was successful!")
+    # end of try/except/else for connection
+
+    return con
+    # end db_connect()
+    
+# declare variables necessary for database connection
+database = " "
+user = " "  
+password = " " 
+host = " " 
+port = " "
+
+# declare variables for file operations
+filepath = " "
+
+# declare variables for PSQL operations
+schema_exists = False
+schema = " "
+table_name = " "
+
+# store sys.argv in args[] for simplicity
+args = sys.argv
+# define index for last arg
+last_arg_index = len(args)
+
+# check if any arguments were provided. args have been provided if len() is greater than 1 (scripts filename counts as an argument to python)
+if len(args) > 1 : 
+    # check if user has requested help
+    if args[1].rstrip() == "-help":
+        # print help text
+        print("provide arguments with flags")
+        # exit script
+        exit()
+    # end if
+    
+    # go through args to look for key-value pairs. arg_index is used to iterate in the loop
+    arg_index = 1
+    while arg_index < len(args):
+        
+        # break for loop if current index is equal to last_arg_index, as this would mean no further key-value pairs can be determined 
+        if arg_index == last_arg_index:
+            print("Insufficient values provided, you will be prompted for remaining values")
+            break
+        # end if last_arg_index
+        
+        # check if arg is equal to -db
+        elif args[arg_index].rstrip() == "-db":
+            # increment i so the value to the key -db can be extracted from args[]  
+            arg_index += 1
+            # store database value in database variable
+            database = args[arg_index].rstrip() 
+        # end elif -db
+        
+        # check if arg is equal to -u
+        elif args[arg_index].rstrip() == "-u":
+            # increment i so the value to key -u can be extracted from args[]
+            arg_index += 1
+            # store user value in user variable
+            user = args[arg_index].rstrip()
+        # end of -u elif
+        
+        # check if arg is equal to -pw
+        elif args[arg_index].rstrip() == "-pw":
+            arg_index += 1
+            password = args[arg_index].rstrip()
+        # end of -pw elif
+        
+        # check if arg is equal to -h
+        elif args[arg_index].rstrip() == "-h":
+            arg_index += 1
+            host = args[arg_index].rstrip()
+        # end of -u elif
+        
+        # check if arg is equal to -pn
+        elif args[arg_index].rstrip() == "-pn":
+            arg_index += 1
+            port = args[arg_index].rstrip()
+        # end of -pn elif
+        
+        # check if arg is equal to -fp
+        elif args[arg_index].rstrip() == "-fp":
+            arg_index += 1
+            filepath = args[arg_index]
+        else:
+             print("Unrecognized key {key}".format(key = args[arg_index]))
+             arg_index += 1
+        # end if/elif/else structure
+        
+        # increase arg_index by one to continue loop to next key-value pair
+        arg_index += 1
+    # end of while loop
+# end of if len(args)
+
+# check if necessary db-parameters are set properly, prompt user for new values if necessary
+if not (database[0].isalpha() and database.isalnum()):
+    while True:
+        db_input = input("Please enter database name: ").strip()
+        
+        if db_input[0].isalpha() and db_input.isalnum():
+            database = db_input
+            break
+        else:
+            print("So sorry, we only support databases starting with an alphabetic character, consisting of only letters and numbers, please try again")
+            continue
+        # end if
+    # end while
+# end database if
+# check if necessary -u parameters are set properly, prompt user for new values if necessary
+if not (user[0].isalpha() and user.isalnum()):
+    while True:
+        u_input = input("Please enter user name: ").strip()
+        
+        if u_input[0].isalpha() and u_input.isalnum():
+            user = u_input
+            break
+        else:
+            print("So sorry, we only support usernames starting with an alphabetic character, consisting of only letters and numbers, please try again")
+            continue
+        # end if
+    # end while
+# end user if
+
+# check if -pw values are set properly, prompt user for new values if necessary
+if password == " ":
+    # check if terminal is tty, example of non-tty: Git Bash
+    if sys.stdin.isatty():
+        password = getpass.getpass("Please provide a password for user [{user}]: ".format(user = user))
+    else:
+        print("getpass is not supported by your terminal, using regular input (password will be visible :/)")
+        password = input("Please provide a password for user [{user}]: ".format(user = user)).rstrip()
+    # end if else isatty()
+
+# check if -h values are set properly, prompt user for new values if necessary
+if host.isspace():
+    while True:
+        h_input = input("Please enter hostname or IP-address: ").strip()
+        
+        if h_input[0].isnumeric() or h_input[0].isalpha():
+            host = h_input
+            break
+        else:
+            print("So sorry, we need a valid address for the host, please try again")
+            continue
+        # end if/else h_input
+    # end while
+# end host.isspace()
+
+# check if -pn is set, prompt user for new values if necessary
+if not port.isnumeric():
+    pn_input = input("Please supply the portnumber for your host [5432]: ").strip()
+    
+    # set port to 5432 if non-numeric value is set
+    if not pn_input.isnumeric():
+        port = "5432"
+    else:
+        port = pn_input
+    # end if/else not pn_input.isnumeric()
+# end if not port.isnumeric()
+connection = db_connect(database, user, password, host, port)
+# try/except/else to open file byway of filepath variable, prompt user for values on except
+try:
+    f = open(filepath)
+except FileNotFoundError as err:
+    # prompts user to enter filepath/-name for textfile
+    while True:
+        filepath = input("Please provide a filename: ").strip()
+        
+        # try/except/else - attempt to open textfile, provide user-friendly error message if it fails
+        try:
+            f = open(filepath)
+        except FileNotFoundError as err:
+            print("Terribly sorry, we can't make sense of this filename/path. Please try again.")
+            
+            # continue loop, user must input filename again
+            continue
+        else:
+            print("File loaded successfully")
+            
+            # break while loop
+            break
+        # end of try except fail
+    # end of while loop
+else:
+    print("File loaded successfully")
+#end of try/except/else
+
+# list - store records for import into schema.table_name
 records = []
 
 # go through textfile line by line
@@ -46,8 +220,74 @@ for i in f.readlines() :
 # close textfile
 f.close()
 
+cursor = connection.cursor()
+
+# create schema or use existing schema
+# while loop runs as long as schema_exists value is False
+while not schema_exists:
+    sch_input = input("Please provide a name for your schema: ").strip()
+    
+    # check if input matches our criteria
+    if sch_input[0].isalpha() and sch_input.isalnum():
+        schema = sch_input
+        
+        # query sql server to check if schema exists, prompt user to create if not
+        while True:
+            # the PSQL query will return one row if the schema exists
+            cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{schema}';".format(schema = schema))
+            
+            # check for 1 row
+            if cursor.rowcount > 0:
+                # set schema_exists to True, then break inner while loop, outer while loop will stop because while not schema_exists will return bool False
+                schema_exists = True
+                break
+            # end of if
+            
+            # if schema does not exist, offer to create it 
+            else:
+                cresch_input = input("It appears that schema {schema} does not exist, would you like to create it? Y/n: ".format(schema = schema)).strip()
+                
+                if cresch_input.upper() != "Y":
+                    # user does not want to create the schema 
+                    print("That's cool, going back to the schema name input phase!")
+                    # break exits inner while loop, outer loop begins anew.
+                    break
+                # end cresch_input == "Y" if
+                
+                # attempt to create schema
+                else:
+                    try:
+                        cursor.execute("CREATE SCHEMA {schema};".format(schema = schema))
+                    except psycopg2.Error as err:
+                        print("Unable to create the new schema")
+                        print(err)
+                        print("Please try again")
+                        # break will exit inner while loop and will enter the outer while loop
+                        break
+                    # end except
+                    
+                    # Successful creation
+                    else:
+                        print("Schema {schema} created sucessfully.".format(schema = schema))
+                        # set schema_exists to True, then break inner while loop, outer while loop will stop because while not schema_exists will return bool False
+                        schema_exists = True
+                        break
+                    # end try/fail/else
+                # end else
+            # end schema creation else
+        # end inner while loop
+    # end if sch_input
+        
+    # users schema name fails criteria.
+    else:
+        print("So sorry, this script only supports schemas starting with a letter and consisting of letters and numbers, please try again")
+        # continues starts a new iteration of the while loop
+        continue
+    # end else
+# end while not schema_exists
+
 # initialize string of the PSQL statement that will create the table 
-create_string = "create table mystaff."
+create_string = 'create table {schema}.'.format(schema = schema)
 
 # prompts user to provide a table-name
 while True:
@@ -149,13 +389,14 @@ for j in range(len(columns)):
 
 # add last characters to complete table create_string
 create_string += ");"
-
+"""
 # cursor needed to execute PSQL commands.
 cursor = connection.cursor()
-
+"""
 # try/except/else - create table and provide confirmation or provide human readable error message
 try:
     cursor.execute(create_string)
+    print(create_string)
     
 except psycopg2.Error as err:
     print("Oh, we're sorry, looks like we weren't able to create your table :/")
@@ -166,17 +407,18 @@ except psycopg2.Error as err:
     
 else:
     print("Table succesfully created!")
+    connection.close()
 # end of try/except/else
 
 # begin insert_string creation
-insert_string = "insert into mystaff.{table_name} values ".format(table_name = table_name)
+insert_string = 'insert into {schema}.{table_name} values '.format(schema = schema, table_name = table_name)
 
 # create variable to store the index of the last index in records[], for use later
 last_record_index = (len(records) -1)
-
+"""
 # preparing cursor needed to execute PSQL statements
 cursor = connection.cursor()
-
+"""
 # adds records from records[], starting with index 1, to insert_string
 for k in range(1, len(records)):
     # store current record for easy reference.
@@ -224,6 +466,10 @@ for k in range(1, len(records)):
 # add last character to finish insert_string PSQL statement
 insert_string += ";"
 
+connection = db_connect(database, user, password, host, port)
+
+cursor = connection.cursor()
+
 # try/except/fail - inserts values and provides confirmation, or provides human readable error if insertion is unsuccessful
 try:
     cursor.execute(insert_string)
@@ -236,11 +482,11 @@ else:
 # end try/except fail
 
 # create PSQL statement to retrieve lines written to database table
-select_string = "SELECT * FROM mystaff.{table_name};".format(table_name = table_name)
-
+select_string = "SELECT * FROM {schema}.{table_name};".format(schema = schema, table_name = table_name)
+"""
 # cursor needed to execute PSQL statement
 cursor = connection.cursor()
-
+"""
 # execute statement
 cursor.execute(select_string)
 
